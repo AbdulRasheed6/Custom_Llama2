@@ -26,7 +26,7 @@ class LlamaRotaryEmbedding(nn.Module):
         """Rotate half of the hidden dimensoins. """
         # x :(B, n_heads, T, head_dim)
         x1= x[..., : x.shape[-1]//2] # first half
-        x2= x[..., : x.shape[-1]//2:] # second half
+        x2= x[..., x.shape[-1]//2:] # second half
         return torch.cat((-x2, x1), dim=-1) # rotated
     
 
@@ -72,7 +72,7 @@ class LlamaRotaryEmbedding(nn.Module):
         
 
         if seq_len> self.max_seq_len_cached or self.cache is None:
-            self._build_cos_sin_cached(seq_len, x.device, x.dtype)
+            self._build_cos_sin_cache(seq_len, x.device, x.dtype)
 
 
         # slice current positions
@@ -97,7 +97,7 @@ class RMSNorm(nn.Module):
         super().__init__()
         self.config= config
         self.num_eps= self.config.num_eps
-        self.weight= nn.Parameter(torch.ones(config.n_dim))
+        self.weight= nn.Parameter(torch.ones(config.dim))
 
     def forward(self, x):
         #x: (B, T, n_embed)
@@ -113,7 +113,7 @@ class RMSNorm(nn.Module):
         return out.to(input_dtype)
 
 
-class LlamaMLP(nn.module):
+class LlamaMLP(nn.Module):
     def __init__(self, config):
         super().__init__()
 
@@ -143,12 +143,12 @@ class LlamaGQA(nn.Module):
 
 
 
-        self.wq= nn.Linear(config.dim, config.n_heads* self.head_dim, biase=False) 
-        self.wk= nn.Linear(config.dim, config.n_kv_heads * self.head_dim, biase=False)
-        self.wv= nn.Linear(config.dim, config.n_kv_heads * self.head_dim, biase=False)
-        self.wo= nn.Linear(config.dim, config.n_embed, biase=False)
+        self.wq= nn.Linear(config.dim, config.n_heads* self.head_dim, bias=False) 
+        self.wk= nn.Linear(config.dim, config.n_kv_heads * self.head_dim, bias=False)
+        self.wv= nn.Linear(config.dim, config.n_kv_heads * self.head_dim, bias=False)
+        self.wo= nn.Linear(config.dim, config.n_embed, bias=False)
 
-        self.rotary_emb= LlamaRotaryEmbedding(self.head_dim)
+        self.rotary_emb= LlamaRotaryEmbedding(config)
 
     def forward(self, x, position_ids, mask: Optional[torch.Tensor]=None):
 
@@ -185,9 +185,9 @@ class LlamaGQA(nn.Module):
 class LlamaBlock(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.attn_norm= RMSNorm(config.dim)
+        self.attn_norm= RMSNorm(config)
         self.attn= LlamaGQA(config)
-        self.ffn_norm= RMSNorm(config.dim)
+        self.ffn_norm= RMSNorm(config)
         self.ffn= LlamaMLP(config)
 
 
@@ -209,7 +209,7 @@ class LlamaConfig:
     vocab_size: int= 32000 # it is set wen te tokenizer is loaded
     num_eps: float= 1e-5
     hidden_dims= 11008
-    head_dim= dim // n_heads
+    head_dim= 4096// 32  #dim // n_heads
     base: float= 10000.0
 
     #Needed for KV cace
@@ -233,13 +233,13 @@ class Llama2(nn.Module):
         self.vocab_size= config.vocab_size
 
 
-        self.tok_embeddings= nn.Embedding(self.vocab_size, config.n_embed)
+        self.tok_embeddings= nn.Embedding(self.vocab_size, config.dim)
         self.layers= nn.ModuleList([LlamaBlock(config) for _ in range(self.n_layers)])
 
-        self.norm= RMSNorm(config.n_embed)
+        self.norm= RMSNorm(config)
 
         
-        lm_head= nn.linear(config.n_embed, self.vocab_size)
+        lm_head= nn.linear(config.dim, self.vocab_size)
 
         #Weight typing(saving parameters)
         self.lm_head.weight= self.tok_embeddings.weight
@@ -258,7 +258,7 @@ class Llama2(nn.Module):
         mask= None
         if T>1:
             mask= torch.full((T,T), float("-inf"), device= x.device)
-            mask= torch.triu(mask, diaonal=1)
+            mask= torch.triu(mask, diagonal=1)
             mask= mask.unsqueeze(0).unsqueeze(0) # (1,1, T, T)
 
         for layer in self.layers:
@@ -279,7 +279,7 @@ if __name__=="__main__":
     text=""
 
     encoded= tokenizer.encode(text)
-    data= torch.tensor(encoded, dtype=torch.lon)
+    data= torch.tensor(encoded, dtype=torch.long)
 
 
     batch_size=4
@@ -295,12 +295,12 @@ if __name__=="__main__":
 
 
 
-    model= Llama2(
+    model= Llama2( 
         vocab_size= tokenizer.vocab_size,
-        dim=512
-        n_layers=6
+        dim=512,
+        n_layers=6,
         n_heads=8, 
-        n_kv_eads=4, # GQA active: 8 Query heads, 4 KV heads
+        n_kv_heads=4, # GQA active: 8 Query heads, 4 KV heads
         hidden_dim= 2048
     )
 
@@ -308,14 +308,14 @@ if __name__=="__main__":
     model.train()
 
     for step in range(1000):
-        xb, yb= get_batch
+        xb, yb= get_batch()
         position_ids= torch.arange(block_size, device=xb.device).unsqueeze(0).expand(batch_size, -1)
         logits= model(xb, position_ids=position_ids)
         loss= F.cross_entropy(logits.view(-1, tokenizer.vocab_size), yb.view(-1))
         
         optimizer.zero_grad()
         loss.backward()
-        optimizer.stop()
+        optimizer.step()
 
         if step % 100 ==0:
             print(f"Step {step} | Loss : {loss.item():.4f}")
