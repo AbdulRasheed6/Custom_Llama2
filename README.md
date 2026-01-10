@@ -61,20 +61,17 @@ We derive three vectors for every token using trainable weights:
 
 1. **Query (Q):** What am I looking for?  
 2. **Key (K):** What information do I contain?  
-3. **Value (V):** If I am relevant, what information do I contribute?  
+3. **Value (V):** If I am relevant, what information do I contribute?
+4. **head_size  \(d_k\):** Dimension of the key vectors (also called **head size**)
 
 **Score Calculation:**
 
-
-\[
-\text{attention\_weights} = \text{Softmax}\left(\frac{QK^T}{\sqrt{\text{head\_size}}}\right) \cdot V
-\]
-
+$$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$$
 
 
 Steps:
 - **Matrix Multiplication:** Creates an affinity matrix showing how much every token relates to others.  
-- **Scaling:** Divides by \(\sqrt{\text{head\_size}}\) to stabilize gradients.  
+- **Scaling:** $\sqrt{d_k}$ to stabilize gradients.  
 - **Mask (Tril):** Applies a lower-triangular mask (`torch.tril`) to block future tokens.  
 - **Softmax:** Normalizes values to sum to 1, creating a weighted map of the past.  
 - **Value Aggregation:** Multiplies this map by \(V\) to get the final context-aware representation.
@@ -86,21 +83,17 @@ Steps:
 RMSNorm ensures data stability. It is different from LayerNorm as it is computationally efficient and removes mean subtraction.
 
 
+$$
+\bar{a}_i = \frac{a_i}{\text{RMS}(\mathbf{a})} \, g_i, 
+\quad \text{where} \quad 
+\text{RMS}(\mathbf{a}) = \sqrt{\frac{1}{n} \sum_{i=1}^n a_i^2 + \epsilon}
+$$
 
-\[
-RMS = \sqrt{\text{mean\_sq} + \epsilon}, \quad X_{norm,i} = \frac{X_i}{RMS}
-\]
+Where :
 
-
-
-1. **Epsilon:** Prevents division by zero.  
-2. **Mean Squared / Variance:** Measures how far the value is from the mean.  
-   
-
-\[
-   \text{variance} = x^2
-   \]
-
-
+- $\bar{a}_i$: Represents the normalised output
+-  $\text{RMS}(\mathbf{a})$: The root mean square of the input vector
+- $g_i$: The learnable  gain parameter (scaling factor).
+- $\epsilon$: To avoid zero division error
 
 ---
