@@ -2,6 +2,7 @@
 
 The Llama 2 architecture took its inspiration from the **transformer architecture** but differs from other instances of second-generation transformers like GPT-2, GPT-3, and DeepSeek.
 
+ ![Image](https://github.com/user-attachments/assets/b7dca53c-3c00-4540-a747-da3c89f64aa4)
 ---
 
 ## Structural Components of the Llama 2 Block
