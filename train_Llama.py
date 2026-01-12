@@ -13,7 +13,7 @@ class LlamaRotaryEmbedding(nn.Module):
         super().__init__()
         
         # precompute inverse frequencies
-        # theta_i= base^(-2i/head_dim) for i=0,2,4......, head_dim-2
+        # theta_i= base^(-2i/dim) for i=0,2,4......, dim-2
         inv_freq= 1.0/(config.base**(torch.arange(0, config.dim, 2, dtype=torch.float32) /config.dim))
         self.register_buffer("inv_freq", inv_freq, persistent=False)
         self.max_seq_len_cached =0
@@ -212,8 +212,6 @@ class LlamaConfig:
     head_dim= 4096// 32  #dim // n_heads
     base: float= 10000.0
 
-    #Needed for KV cace
-    max_batch_size: int=32
     seq_len : int=2048
 
 
