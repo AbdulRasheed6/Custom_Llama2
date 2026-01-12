@@ -17,7 +17,7 @@ The Llama 2 architecture took its inspiration from the **transformer architectur
    - **Output layer**
 
 3. **Grouped Query Masked Self-Attention (GQA + MSA)**  
-   This is the communication layer of the Llama 2 architecture. It differs slightly from the GPT-2 self-attention mechanism because it shares key/value heads across query heads.  
+   This is the communication layer of the **Llama 3** architecture, **although Multi head attention was used for Llama2**, but I decided to use GQA since it is the only major architectural difference from Llama2 . The GQA differs slightly from the GPT-2 self-attention mechanism because it  share key/value heads across query heads.  
    - Queries have more heads than keys/values.  
    - Keys/values are reused across queries, lowering redundancy.  
 
